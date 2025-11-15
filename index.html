@@ -8,53 +8,89 @@
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&display=swap');
     body { margin: 0; background: #000; color: #0f0; font-family: 'Orbitron', monospace; text-align: center; padding: 50px; }
     h1 { font-size: 3em; text-shadow: 0 0 10px #0f0; }
-    input { padding: 15px; width: 350px; font-size: 18px; background: #111; color: #0f0; border: 2px solid #0f0; }
+    input { padding: 15px; width: 80px; font-size: 18px; background: #111; color: #0f0; border: 2px solid #0f0; text-align: center; margin: 5px; }
     button { padding: 15px 30px; font-size: 18px; background: #0f0; color: #000; border: none; cursor: pointer; margin: 20px; }
     .status { margin: 30px; font-size: 1.5em; min-height: 50px; }
-    .valid { color: #0f0; }
-    .invalid { color: #f00; }
+    .valid { color: #0f0; text-shadow: 0 0 5px #0f0; }
+    .invalid { color: #f00; text-shadow: 0 0 5px #f00; }
+    .key-input { display: flex; justify-content: center; gap: 5px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
   <h1>VXRIFYZ AUTH</h1>
   <p>Enter your license key to unlock Vxrifyz Ultra</p>
-  <input type="text" id="key" placeholder="XXXX-XXXX-XXXX-XXXX" />
-  <button onclick="verify()">VERIFY KEY</button>
+  
+  <div class="key-input">
+    <input type="text" id="p1" maxlength="4" placeholder="XXXX" />
+    <input type="text" id="p2" maxlength="4" placeholder="XXXX" />
+    <input type="text" id="p3" maxlength="4" placeholder="XXXX" />
+    <input type="text" id="p4" maxlength="4" placeholder="XXXX" />
+  </div>
+  
+  <button onclick="verify()">VERIFY</button>
   <div id="status" class="status"></div>
 
   <script>
     const SALT = "VXRIFYZ_2025_EXO";
-    const AUTH_URL = "https://vxrifyz-auth.yourusername.workers.dev/verify";
+    const VALID_KEYS = {
+      // KEYS AUTO-ADDED BY LOCAL BOT
+    };
+
+    // Auto-focus
+    ['p1','p2','p3','p4'].forEach((id, i) => {
+      const el = document.getElementById(id);
+      el.addEventListener('input', () => {
+        el.value = el.value.toUpperCase();
+        if (el.value.length === 4 && i < 3) document.getElementById(['p2','p3','p4'][i]).focus();
+      });
+    });
 
     async function verify() {
-      const key = document.getElementById('key').value.trim();
-      if (!key) return;
-
+      const key = ['p1','p2','p3','p4'].map(id => document.getElementById(id).value.toUpperCase()).join('-');
       const status = document.getElementById('status');
-      status.innerHTML = "Verifying...";
-      status.className = "status";
 
-      const input = key + SALT;
-      const encoder = new TextEncoder();
-      const data = encoder.encode(input);
-      const hashBuffer = await crypto.subtle.digest('SHA-512', data);
-      const hash = Array.from(new Uint8Array(hashBuffer))
-        .map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-
-      try {
-        const res = await fetch(`${AUTH_URL}?k=${hash}`);
-        const data = await res.json();
-
-        if (data.status === 'valid') {
-          status.innerHTML = `<span class="valid">VALID</span><br>Expires: ${data.expiry === 'lifetime' ? 'Never' : new Date(data.expiry).toLocaleString()}`;
-        } else if (data.status === 'expired') {
-          status.innerHTML = `<span class="invalid">EXPIRED</span><br>Ended: ${new Date(data.expiry).toLocaleString()}`;
-        } else {
-          status.innerHTML = `<span class="invalid">INVALID KEY</span>`;
-        }
-      } catch (e) {
-        status.innerHTML = `<span class="invalid">CONNECTION ERROR</span>`;
+      if (!/^[\w]{4}-[\w]{4}-[\w]{4}-[\w]{4}$/.test(key)) {
+        status.innerHTML = `<span class="invalid">INVALID FORMAT</span>`;
+        return;
       }
+
+      const expiry = VALID_KEYS[key];
+      if (!expiry) {
+        status.innerHTML = `<span class="invalid">INVALID KEY</span>`;
+        return;
+      }
+
+      if (expiry !== "lifetime" && new Date(expiry) < new Date()) {
+        status.innerHTML = `<span class="invalid">EXPIRED</span><br>Ended: ${new Date(expiry).toLocaleString()}`;
+        return;
+      }
+
+      status.innerHTML = `<span class="valid">VALID</span><br>Expires: ${expiry === 'lifetime' ? 'Never' : new Date(expiry).toLocaleString()}`;
+      localStorage.setItem('vxrifyz_license', JSON.stringify({ key, expiry, verified: true }));
+    }
+
+    // Auto-refresh keys every 10 seconds
+    setInterval(async () => {
+      try {
+        const res = await fetch('index.html?' + Date.now());
+        const text = await res.text();
+        const match = text.match(/const VALID_KEYS = \{([^}]*)\}/);
+        if (match) {
+          const obj = {};
+          match[1].split(',').forEach(line => {
+            const [k, v] = line.trim().split(':');
+            if (k && v) obj[k.trim().replace(/"/g, '')] = v.trim().replace(/"/g, '');
+          });
+          Object.assign(VALID_KEYS, obj);
+        }
+      } catch(e) {}
+    }, 10000);
+
+    // Auto-fill from URL
+    const urlKey = new URLSearchParams(location.search).get('key');
+    if (urlKey && urlKey.length === 19) {
+      urlKey.split('-').forEach((p, i) => document.getElementById(['p1','p2','p3','p4'][i]).value = p);
+      verify();
     }
   </script>
 </body>
