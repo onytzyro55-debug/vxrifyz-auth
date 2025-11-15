@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VXRIFYZ AUTH</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&display=swap');
+    body { margin: 0; background: #000; color: #0f0; font-family: 'Orbitron', monospace; text-align: center; padding: 50px; }
+    h1 { font-size: 3em; text-shadow: 0 0 10px #0f0; }
+    input { padding: 15px; width: 350px; font-size: 18px; background: #111; color: #0f0; border: 2px solid #0f0; }
+    button { padding: 15px 30px; font-size: 18px; background: #0f0; color: #000; border: none; cursor: pointer; margin: 20px; }
+    .status { margin: 30px; font-size: 1.5em; min-height: 50px; }
+    .valid { color: #0f0; }
+    .invalid { color: #f00; }
+  </style>
+</head>
+<body>
+  <h1>VXRIFYZ AUTH</h1>
+  <p>Enter your license key to unlock Vxrifyz Ultra</p>
+  <input type="text" id="key" placeholder="XXXX-XXXX-XXXX-XXXX" />
+  <button onclick="verify()">VERIFY KEY</button>
+  <div id="status" class="status"></div>
+
+  <script>
+    const SALT = "VXRIFYZ_2025_EXO";
+    const AUTH_URL = "https://vxrifyz-auth.yourusername.workers.dev/verify";
+
+    async function verify() {
+      const key = document.getElementById('key').value.trim();
+      if (!key) return;
+
+      const status = document.getElementById('status');
+      status.innerHTML = "Verifying...";
+      status.className = "status";
+
+      const input = key + SALT;
+      const encoder = new TextEncoder();
+      const data = encoder.encode(input);
+      const hashBuffer = await crypto.subtle.digest('SHA-512', data);
+      const hash = Array.from(new Uint8Array(hashBuffer))
+        .map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+
+      try {
+        const res = await fetch(`${AUTH_URL}?k=${hash}`);
+        const data = await res.json();
+
+        if (data.status === 'valid') {
+          status.innerHTML = `<span class="valid">VALID</span><br>Expires: ${data.expiry === 'lifetime' ? 'Never' : new Date(data.expiry).toLocaleString()}`;
+        } else if (data.status === 'expired') {
+          status.innerHTML = `<span class="invalid">EXPIRED</span><br>Ended: ${new Date(data.expiry).toLocaleString()}`;
+        } else {
+          status.innerHTML = `<span class="invalid">INVALID KEY</span>`;
+        }
+      } catch (e) {
+        status.innerHTML = `<span class="invalid">CONNECTION ERROR</span>`;
+      }
+    }
+  </script>
+</body>
+</html>
